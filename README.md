@@ -24,7 +24,9 @@ python processed_step_multilabel_data_v2.py
 运行训练脚本，使用 step-level 多任务模型：
 
 ```bash
-python train_step_cidgmed.py --processed_dir processed_stepcidgmed --use_scaled_time
+python src/train_step_cidgmed.py --processed_dir processed_stepcidgmed --use_scaled_time
+# or using src/main.py
+python src/main.py --processed_dir processed_stepcidgmed --use_scaled_time
 ```
 
 ## 当前范围
