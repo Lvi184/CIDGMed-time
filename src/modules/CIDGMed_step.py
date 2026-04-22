@@ -55,6 +55,7 @@ class StepCIDGMedFull(nn.Module):
         num_med,
         num_diag,
         num_proc,
+        num_causal_features=13,
         hidden_dim=128,
         dropout=0.2,
         use_causal_bias=True,
@@ -81,10 +82,9 @@ class StepCIDGMedFull(nn.Module):
         
         # Causal review
         self.use_causal_bias = use_causal_bias
-        if use_causal_bias:
-            self.causality_review = CausalityReview(num_diag, num_proc, num_med, causal_weight)
+        self.causal_weight = causal_weight
         
-    def forward(self, x_clinical, x_prev_med, x_time_ctx, diag_features, proc_features, diag_med_mat=None, proc_med_mat=None):
+    def forward(self, x_clinical, x_prev_med, x_time_ctx, causal_features=None, causal_effect_mat=None):
         # Encode each part
         h_clinical = self.clinical_encoder(x_clinical)
         h_prev_med = self.prev_med_encoder(x_prev_med)
@@ -98,8 +98,9 @@ class StepCIDGMedFull(nn.Module):
         med_logits = self.med_head(h)
         time_pred = self.time_head(h).squeeze(-1)
         
-        # Apply causal review (optional)
-        if self.use_causal_bias and diag_med_mat is not None and proc_med_mat is not None:
-            med_logits = self.causality_review(med_logits, diag_features, proc_features, diag_med_mat, proc_med_mat)
+        # Apply causal bias from new effect matrix
+        if self.use_causal_bias and causal_effect_mat is not None and causal_features is not None:
+            causal_bias = torch.matmul(causal_features, causal_effect_mat)  # batch x num_med
+            med_logits = med_logits + self.causal_weight * causal_bias
         
         return med_logits, time_pred

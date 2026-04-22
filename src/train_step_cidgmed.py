@@ -26,8 +26,8 @@ def compute_loss(med_logits, time_pred, y_med, y_time, alpha=0.5):
     return loss_med + alpha * loss_time
 
 
-def extract_diag_proc_features(x_batch, meta):
-    """Extract diagnostic-like and procedure-like features for causal bias"""
+def extract_causal_features(x_batch, meta):
+    """Extract all features used for causal effect matrix"""
     diagnostic_like_features = [
         'out_diagnosis_code',
         'severity', 
@@ -47,26 +47,17 @@ def extract_diag_proc_features(x_batch, meta):
         'history_surgery',
     ]
     
-    # Create feature vectors (clip to available features)
-    diag_features = []
-    for feat in diagnostic_like_features:
+    all_causal_features = diagnostic_like_features + procedure_like_features
+    
+    features = []
+    for feat in all_causal_features:
         if feat in meta['all_x_cols']:
             col_idx = meta['all_x_cols'].index(feat)
-            diag_features.append(x_batch[:, col_idx].unsqueeze(1))
+            features.append(x_batch[:, col_idx].unsqueeze(1))
         else:
-            diag_features.append(torch.zeros((x_batch.shape[0], 1), device=x_batch.device))
+            features.append(torch.zeros((x_batch.shape[0], 1), device=x_batch.device))
     
-    proc_features = []
-    for feat in procedure_like_features:
-        if feat in meta['all_x_cols']:
-            col_idx = meta['all_x_cols'].index(feat)
-            proc_features.append(x_batch[:, col_idx].unsqueeze(1))
-        else:
-            proc_features.append(torch.zeros((x_batch.shape[0], 1), device=x_batch.device))
-    
-    diag_features = torch.cat(diag_features, dim=1)
-    proc_features = torch.cat(proc_features, dim=1)
-    return diag_features, proc_features
+    return torch.cat(features, dim=1)
 
 
 def main():
@@ -94,13 +85,12 @@ def main():
     sample = dataset[0]
     meta = json.load(open(processed_dir / "meta_columns.json", "r"))
     
-    # Load causal relevance matrices
-    diag_med_mat = None
-    proc_med_mat = None
+    # Load causal effect matrix
+    causal_effect_mat = None
     if args.use_causal_bias:
-        if (processed_dir / "Diag_Med_relevance.npy").exists() and (processed_dir / "Proc_Med_relevance.npy").exists():
-            diag_med_mat = torch.tensor(np.load(processed_dir / "Diag_Med_relevance.npy"), dtype=torch.float32)
-            proc_med_mat = torch.tensor(np.load(processed_dir / "Proc_Med_relevance.npy"), dtype=torch.float32)
+        causal_effect_path = processed_dir / "causal_effect_matrix.npy"
+        if causal_effect_path.exists():
+            causal_effect_mat = torch.tensor(np.load(causal_effect_path), dtype=torch.float32)
 
     model = StepCIDGMedFull(
         clinical_dim=sample["x_clinical"].shape[0],
@@ -125,21 +115,18 @@ def main():
             y_med = batch["y_med"]
             y_time = batch["y_time"]
             
-            # Get diag/proc features
-            diag_features, proc_features = extract_diag_proc_features(x_clinical, meta)
+            # Get causal features
+            causal_features = extract_causal_features(x_clinical, meta)
             
-            if args.use_causal_bias and diag_med_mat is not None:
-                diag_med_mat = diag_med_mat.to(x_clinical.device)
-                proc_med_mat = proc_med_mat.to(x_clinical.device)
+            if args.use_causal_bias and causal_effect_mat is not None:
+                causal_effect_mat = causal_effect_mat.to(x_clinical.device)
             
             med_logits, time_pred = model(
                 x_clinical,
                 x_prev_med,
                 x_time_ctx,
-                diag_features,
-                proc_features,
-                diag_med_mat,
-                proc_med_mat,
+                causal_features,
+                causal_effect_mat,
             )
 
             loss = compute_loss(med_logits, time_pred, y_med, y_time)
