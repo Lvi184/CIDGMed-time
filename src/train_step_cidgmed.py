@@ -1,4 +1,8 @@
 
+from pathlib import Path
+import sys
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.append(str(ROOT))
 import argparse
 import json
 import numpy as np
@@ -74,7 +78,7 @@ def main():
     processed_dir = Path(args.processed_dir)
     dataset = build_dataset_from_dir(processed_dir, args.use_scaled_time)
 
-    groups = pd.read_csv(processed_dir / "groups_patient_id.csv", header=None).values.flatten()
+    groups = pd.read_csv(processed_dir / "groups_patient_id.csv").values.flatten()
 
     splitter = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
     train_idx, val_idx = next(splitter.split(np.arange(len(dataset)), groups=groups))
