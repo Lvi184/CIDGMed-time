@@ -1,0 +1,13 @@
+
+# Ignore data directories
+data/
+saved/
+__pycache__/
+*.pyc
+*.pkl
+*.joblib
+*.csv
+processed_stepcidgmed/
+processed_multlabel_raw/
+.DS_Store
+
