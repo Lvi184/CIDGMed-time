@@ -1,34 +1,26 @@
 
 import json
 import pandas as pd
-import numpy as np
-from pathlib import Path
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 
-class StepMultiTaskDataset(Dataset):
-    def __init__(self, processed_dir, use_scaled_time=True):
-        processed_dir = Path(processed_dir)
-        self.processed_dir = processed_dir
+class StepMultilabelDataset(Dataset):
+    def __init__(self, x_file, y_med_file, y_time_file, meta_file):
+        self.X = pd.read_csv(x_file)
+        self.Y_med = pd.read_csv(y_med_file)
+        self.y_time = pd.read_csv(y_time_file)
 
-        # 读取元信息
-        with open(processed_dir / "meta_columns.json", "r", encoding="utf-8") as f:
-            self.meta = json.load(f)
+        with open(meta_file, "r", encoding="utf-8") as f:
+            meta = json.load(f)
 
-        self.clinical_feature_cols = self.meta["clinical_feature_cols"]
-        self.prev_med_cols = self.meta["prev_med_cols"]
-        self.time_cols = self.meta["time_cols"]
-        self.target_cols = self.meta["target_cols"]
+        self.clinical_feature_cols = meta["clinical_feature_cols"]
+        self.prev_med_cols = meta["prev_med_cols"]
+        self.time_cols = meta["time_cols"]
 
-        # 读取数据
-        self.X = pd.read_csv(processed_dir / "X_multilabel.csv")
-        self.Y_med = pd.read_csv(processed_dir / "Y_multilabel_drugs.csv")
-        
-        if use_scaled_time:
-            self.y_time = pd.read_csv(processed_dir / "y_step_time_scaled.csv")
-        else:
-            self.y_time = pd.read_csv(processed_dir / "y_step_time.csv")
+        # ✅ 长度一致性检查（重要）
+        assert len(self.X) == len(self.Y_med) == len(self.y_time), \
+            f"Length mismatch: X={len(self.X)}, Y_med={len(self.Y_med)}, y_time={len(self.y_time)}"
 
     def __len__(self):
         return len(self.X)
@@ -39,9 +31,11 @@ class StepMultiTaskDataset(Dataset):
         x_clinical = torch.tensor(row[self.clinical_feature_cols].values, dtype=torch.float32)
         x_prev_med = torch.tensor(row[self.prev_med_cols].values, dtype=torch.float32)
         x_time_ctx = torch.tensor(row[self.time_cols].values, dtype=torch.float32)
-        
+
         y_med = torch.tensor(self.Y_med.iloc[idx].values, dtype=torch.float32)
-        y_time = torch.tensor(float(self.y_time.iloc[idx]), dtype=torch.float32)
+
+        # ✅ 修复关键 bug
+        y_time = torch.tensor(float(self.y_time.iloc[idx, 0]), dtype=torch.float32)
 
         return {
             "x_clinical": x_clinical,
@@ -53,17 +47,15 @@ class StepMultiTaskDataset(Dataset):
 
 
 def build_dataset_from_dir(processed_dir, use_scaled_time=True):
-    return StepMultiTaskDataset(processed_dir, use_scaled_time)
+    x_file = f"{processed_dir}/X_multilabel.csv"
+    y_med_file = f"{processed_dir}/Y_multilabel_drugs.csv"
 
+    if use_scaled_time:
+        y_time_file = f"{processed_dir}/y_step_time_scaled.csv"
+    else:
+        y_time_file = f"{processed_dir}/y_step_time.csv"
 
-def get_dataloaders(dataset, train_idx, val_idx, batch_size=32, num_workers=0):
-    from torch.utils.data import Subset
+    meta_file = f"{processed_dir}/meta_columns.json"
 
-    train_set = Subset(dataset, train_idx)
-    val_set = Subset(dataset, val_idx)
-
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-    val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-
-    return train_loader, val_loader
+    return StepMultilabelDataset(x_file, y_med_file, y_time_file, meta_file)
 

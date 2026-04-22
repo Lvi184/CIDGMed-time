@@ -219,7 +219,13 @@ meta_columns = {
     "target_cols": target_cols,
     "clinical_feature_cols": clinical_feature_cols,
     "all_x_cols": list(X.columns),
-    "path_col": "drug_path_value",
+
+    # ✅ 明确说明是保留字段（重要）
+    "reserved_path_col": "drug_path_value",
+
+    # ✅ 新增（后续升级用）
+    "categorical_feature_cols": [],
+    "numeric_feature_cols": clinical_feature_cols,
 }
 
 with open(OUTPUT_DIR / "meta_columns.json", "w", encoding="utf-8") as f:
