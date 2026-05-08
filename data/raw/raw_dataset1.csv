@@ -1,0 +1,3 @@
+﻿PADMNO,gender,age_group,admission_age,los,out_diagnosis_code,operation_NO,drug.sequence,drug.time,drug.path,mood,bad_sleep,worry
+1,F,adult,35,32,F32.1|G47.0,OP01,ADP*AP*OT-ADP*AP*ASE*OT-ADP*AP*OT,9+25+24,9xADP*AP*OT-25xADP*AP*ASE*OT-24xADP*AP*OT,1,1,1
+2,M,adult,42,18,F41.1,OP02,AA*ADP-AA*ADP*OT-AA*ADP*AP*OT,3+14+10,3xAA*ADP-14xAA*ADP*OT-10xAA*ADP*AP*OT,1,0,1
